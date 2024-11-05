@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"main/config"
+	"main/domain"
 	"net/http"
 	"net/url"
 	"time"
@@ -111,12 +112,41 @@ func (c *Client) updateToken() error {
 	return nil
 }
 
-func (c *Client) Request(message string) (string, error) {
-	jsonData := fmt.Sprintf(`{"model":"%s","messages":[{"role":"user","content":"%s"}],"stream":false,"repetition_penalty":1}`, c.GigaChatModel, message)
+type Request struct {
+	Model             string             `json:"model"`
+	Messages          []domain.AIMessage `json:"messages"`
+	Stream            bool               `json:"stream"`
+	RepetitionPenalty float32            `json:"repetition_penalty"`
+	Temperature       float32            `json:"temperature"`
+	TopP              float32            `json:"top_p"`
+}
 
-	fmt.Println(jsonData)
+type Response struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+}
 
-	req, err := http.NewRequest("POST", "https://gigachat.devices.sberbank.ru/api/v1/chat/completions", bytes.NewBuffer([]byte(jsonData)))
+func (c *Client) Request(messages []domain.AIMessage, temperature float32) (string, error) {
+	AIRequest := Request{
+		Model:             "GigaChat-Pro",
+		Messages:          messages,
+		Stream:            false,
+		RepetitionPenalty: 1,
+		Temperature:       temperature,
+		TopP:              0.2,
+	}
+
+	jsonAIRequest, err := json.Marshal(AIRequest)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", "https://gigachat.devices.sberbank.ru/api/v1/chat/completions", bytes.NewBuffer(jsonAIRequest))
 
 	if err != nil {
 		return "", err
@@ -135,13 +165,25 @@ func (c *Client) Request(message string) (string, error) {
 		return "", err
 	}
 
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("status code %d, resp: %s", resp.StatusCode, string(b))
+	respStruct := new(Response)
+
+	if err := json.Unmarshal(b, respStruct); err != nil {
+		return "", err
 	}
 
-	respMessage := parseMessageContent(string(b))
+	fmt.Printf("%+v\n", respStruct)
 
-	return respMessage, nil
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("status code %d, error: %s", resp.StatusCode, respStruct.Message)
+	}
+
+	fmt.Println("response: ", string(b))
+
+	if len(respStruct.Choices) == 0 {
+		return "", errors.New("no choices found")
+	}
+
+	return respStruct.Choices[0].Message.Content, nil
 }
 
 func parseMessageContent(jsonResp string) string {

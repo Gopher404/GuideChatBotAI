@@ -8,12 +8,12 @@ import (
 )
 
 type Bot struct {
-	api            *tgbotapi.BotAPI
-	MessageHandler func(update *tgbotapi.Update) (tgbotapi.Chattable, error)
-	cfg            *config.TGBotConfig
+	api     *tgbotapi.BotAPI
+	handler *Handler
+	cfg     *config.TGBotConfig
 }
 
-func NewBot(cfg *config.TGBotConfig) (*Bot, error) {
+func NewBot(handler *Handler, cfg *config.TGBotConfig) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Token)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func NewBot(cfg *config.TGBotConfig) (*Bot, error) {
 		api: api,
 		cfg: cfg,
 	}
-	bot.MessageHandler = MessageHandler
+	bot.handler = handler
 
 	return bot, nil
 }
@@ -52,9 +52,10 @@ func (bot *Bot) Run() {
 					defer func() { <-tokens }()
 				}
 
-				msg, err := bot.MessageHandler(&update)
+				msg, err := bot.handler.MessageHandler(&update)
 				if err != nil {
 					log.Printf("error handle message (%s)\n: %s", strings.ReplaceAll(update.Message.Text, "\n", "\\n"), err.Error())
+					return
 				}
 
 				if _, err := bot.api.Send(msg); err != nil {

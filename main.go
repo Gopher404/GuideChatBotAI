@@ -5,7 +5,10 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 	"main/config"
+	"main/database"
+	"main/gigachat"
 	"main/tg_bot"
+	"main/usecase"
 	"os"
 )
 
@@ -25,10 +28,25 @@ func main() {
 
 	fmt.Println(cfg)
 
-	bot, err := tg_bot.NewBot(&cfg.TGBot)
+	db, err := database.Connect(&cfg.DB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	attractionsRepo := database.NewAttractionsRepo(db)
+
+	AIClient, err := gigachat.NewClient(&cfg.GigaChat)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tourMaker := usecase.NewTourMaker(attractionsRepo, AIClient)
+
+	handler := tg_bot.NewHandler(tourMaker)
+
+	bot, err := tg_bot.NewBot(handler, &cfg.TGBot)
 	if err != nil {
 		log.Fatal(err)
 	}
 	bot.Run()
-
 }
