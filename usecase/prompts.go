@@ -9,11 +9,15 @@ const (
 
 	promptGetCountPlacesOnDay = "Определи по сообщению количество мест, которое пользователь собирается посетить за 1 день, если в это не указано то отправь 0. Кроме количества мест ничего не отправляй. Сообщение пользователя: "
 
-	promptGenerateTourOnDay = "Помоги составить тур по Калининграду для пользователя на 1 день из %d. . Тебе нужно вернуть список из id мест. У меня есть пожелания пользователя: (%s). Также есть список мест, из которых надо его составить: %+v "
+	promptGenerateTour = `Тебе нужно составить тур по Калининграду. Составлять будем на каждый день отдельным сообщением. При этом нужно учесть пожелания пользователя: (%s). Следующими сообщениями я буду отправлять список мест, из которых можно составить тур на день. Повторять места нельзя! Если их не хватает напиши свои. Сейчас ничего не составляй. Ты готов?`
 
-	promptGenerateTour = `Тебе нужно составить тур по Калининграду. При этом нужно учесть пожелания пользователя. Также у меня есть список мест, из которых тебе надо составить тур если их недостаточно то добавь места от себя. Не забудь учесть предпочтения пользователя. Вот список мест: `
+	promptGenerateTourOnDay = "Теперь составь тур на %d-й день. Не повторяйся с предыдущими днями и не забудь про пожелания пользователя. Список мест, который можно использовать для составления тура на этот день: %+v "
 )
 
-func createPromptGenerateTourOnDay(userMessage string, days int, attractions []MinAttraction) string {
-	return fmt.Sprintf(promptGenerateTourOnDay, days, userMessage, attractions)
+func createPromptGenerateTour(userMessage string) string {
+	return fmt.Sprintf(promptGenerateTour, userMessage)
+}
+
+func createPromptGenerateTourOnDay(day int, attractions []MinAttraction) string {
+	return fmt.Sprintf(promptGenerateTourOnDay, day, attractions)
 }

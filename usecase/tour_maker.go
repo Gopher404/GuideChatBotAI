@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"main/domain"
 	"math/rand"
+	"os"
 	"strings"
 )
 
@@ -63,8 +65,6 @@ func (tm *TourMaker) NewTour(userMessage string) (string, error) {
 		return "", fmt.Errorf("ai: cannot get days: %w", err)
 	}
 
-	log.Println("daysString: ", daysString)
-
 	days := tm.findNum(daysString)
 	if days == 0 {
 		days = 7
@@ -78,8 +78,6 @@ func (tm *TourMaker) NewTour(userMessage string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("ai: cannot get days: %w", err)
 	}
-
-	log.Println("countPlacesByDayString: ", countPlacesByDayString)
 
 	countPlacesByDay := tm.findNum(countPlacesByDayString)
 	if countPlacesByDay == 0 {
@@ -105,31 +103,87 @@ func (tm *TourMaker) NewTour(userMessage string) (string, error) {
 		}
 	}
 
-	messages = []domain.AIMessage{}
+	messages = []domain.AIMessage{
+		{
+			"user", createPromptGenerateTour(userMessage),
+		},
+	}
+
+	resp, err := tm.AI.Request(messages, 0.7)
+	if err != nil {
+		return "", fmt.Errorf("ai: cannot create tour: %w", err)
+	}
+
+	messages = append(messages, domain.AIMessage{Role: "assistant", Content: resp})
 
 	for day := 0; day < days; day++ {
 		rand.Shuffle(len(minAttractions), func(i, j int) {
 			minAttractions[i], minAttractions[j] = minAttractions[j], minAttractions[i]
 		})
+		fmt.Print("attractions to request ")
+		for _, attraction := range minAttractions[:10] {
+			fmt.Print(attraction.Id, " ")
+		}
+		fmt.Println()
 
 		msg := domain.AIMessage{
 			Role:    "user",
-			Content: createPromptGenerateTourOnDay(userMessage, days, minAttractions[:10]),
+			Content: createPromptGenerateTourOnDay(day+1, minAttractions[:10]),
 		}
 
 		messages = append(messages, msg)
 
-		resp, err := tm.AI.Request(messages, 0.5)
+		resp, err := tm.AI.Request(messages, 0.7)
 		if err != nil {
 			return "", fmt.Errorf("ai: cannot create tour: %w", err)
 		}
 
 		messages = append(messages, domain.AIMessage{Role: "assistant", Content: resp})
 
-		log.Printf("resp: '%s'\n", resp)
 	}
 
-	return fmt.Sprint("preferences: ", preferences, "days: ", days, "countPlacesByDay: ", countPlacesByDay), nil
+	f, _ := os.Create("messages.json")
+	if err := json.NewEncoder(f).Encode(messages); err != nil {
+		log.Println("cannot encode messages.json", err)
+	}
+
+	log.Println("preferences: ", preferences, "days: ", days, " countPlacesByDay: ", countPlacesByDay)
+
+	return tm.createResultFromMessages(messages), nil
+}
+
+func (tm *TourMaker) createResultFromMessages(messages []domain.AIMessage) string {
+	var result string
+	var lastSentence []rune
+
+	messages = messages[3:]
+
+	for _, message := range messages {
+		if message.Role == "user" {
+			continue
+		}
+
+		content := []rune(message.Content)
+
+		// remove last sentence
+		var idx int
+
+		for i := len(content) - 5; i > 0; i-- {
+			if content[i] == '\n' {
+				idx = i
+				break
+			}
+		}
+		if idx < len(content)/2 {
+			idx = len(content)
+		} else {
+			lastSentence = content[idx+1:]
+		}
+
+		result += "\n" + string(content[:idx]) + "\n"
+	}
+
+	return result + string(lastSentence)
 }
 
 func (tm *TourMaker) parseAIPreferences(msg string) []string {

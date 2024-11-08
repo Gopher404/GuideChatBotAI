@@ -138,7 +138,7 @@ func (c *Client) Request(messages []domain.AIMessage, temperature float32) (stri
 		Stream:            false,
 		RepetitionPenalty: 1,
 		Temperature:       temperature,
-		TopP:              0.2,
+		TopP:              0.4,
 	}
 
 	jsonAIRequest, err := json.Marshal(AIRequest)
@@ -171,13 +171,9 @@ func (c *Client) Request(messages []domain.AIMessage, temperature float32) (stri
 		return "", err
 	}
 
-	fmt.Printf("%+v\n", respStruct)
-
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("status code %d, error: %s", resp.StatusCode, respStruct.Message)
 	}
-
-	fmt.Println("response: ", string(b))
 
 	if len(respStruct.Choices) == 0 {
 		return "", errors.New("no choices found")
@@ -192,8 +188,6 @@ func parseMessageContent(jsonResp string) string {
 	key := "content"
 	for i := len(key); i < len(jsonResp); i++ {
 		if jsonResp[i-len(key):i] == key {
-
-			fmt.Println("find", jsonResp[i-len(key):i])
 
 			var idx1, idx2 int
 

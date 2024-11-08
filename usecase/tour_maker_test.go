@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseAIResponse(t *testing.T) {
+func TestParseAIPreferences(t *testing.T) {
 	s := &TourMaker{}
 
 	tests := []struct {
